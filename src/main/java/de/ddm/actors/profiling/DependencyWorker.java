@@ -13,8 +13,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 
 public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message> {
 
@@ -22,7 +21,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	// Actor Messages //
 	////////////////////
 
-	public interface Message extends AkkaSerializable {
+	public interface Message extends AkkaSerializable, LargeMessageProxy.LargeMessage {
 	}
 
 	@Getter
@@ -38,8 +37,14 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	@AllArgsConstructor
 	public static class TaskMessage implements Message {
 		private static final long serialVersionUID = -4667745204456518160L;
-		ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
-		int task;
+		//ActorRef<LargeMessageProxy.Message> dependencyMinerLargeMessageProxy;
+		ActorRef<DependencyMiner.Message> replyTo;
+		List<Set<String>> task;
+	}
+
+	@NoArgsConstructor
+	public static class ShutdownMessage implements Message {
+		private static final long serialVersionUID = 7516129288777469221L;
 	}
 
 	////////////////////////
@@ -76,13 +81,14 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		return newReceiveBuilder()
 				.onMessage(ReceptionistListingMessage.class, this::handle)
 				.onMessage(TaskMessage.class, this::handle)
+				.onMessage(ShutdownMessage.class, this::handle)
 				.build();
 	}
 
 	private Behavior<Message> handle(ReceptionistListingMessage message) {
 		Set<ActorRef<DependencyMiner.Message>> dependencyMiners = message.getListing().getServiceInstances(DependencyMiner.dependencyMinerService);
 		for (ActorRef<DependencyMiner.Message> dependencyMiner : dependencyMiners)
-			dependencyMiner.tell(new DependencyMiner.RegistrationMessage(this.getContext().getSelf()));
+			dependencyMiner.tell(new DependencyMiner.RegistrationMessage(this.getContext().getSelf(), this.largeMessageProxy));
 		return this;
 	}
 
@@ -90,16 +96,44 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		this.getContext().getLog().info("Working!");
 		// I should probably know how to solve this task, but for now I just pretend some work...
 
-		int result = message.getTask();
-		long time = System.currentTimeMillis();
-		Random rand = new Random();
-		int runtime = (rand.nextInt(2) + 2) * 1000;
-		while (System.currentTimeMillis() - time < runtime)
-			result = ((int) Math.abs(Math.sqrt(result)) * result) % 1334525;
+		boolean ind = true;
+		String[] depColumn = Arrays.copyOf(message.getTask().get(0).toArray(), message.getTask().get(0).size(), String[].class);
+		String[] refColumn = Arrays.copyOf(message.getTask().get(1).toArray(), message.getTask().get(1).size(), String[].class);
 
-		LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.CompletionMessage(this.getContext().getSelf(), result);
-		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, message.getDependencyMinerLargeMessageProxy()));
+		int depColumnSize = depColumn.length;
+		int refColumnSize = refColumn.length;
+
+		if (depColumnSize > refColumnSize){
+			ind = false;
+		}else{
+			// Check Inclusion Dependency: if depColumn c refColumn
+			HashSet<String> hashSet = new HashSet<>();
+
+			// hashSet stores all the values of refColumn
+			for (int i = 0; i < refColumnSize; i++) {
+				if (!hashSet.contains(refColumn[i]))
+					hashSet.add(refColumn[i]);
+			}
+
+			// loop to check if all elements of depColumn also lies in refColumn
+			for (int i = 0; i < depColumnSize; i++) {
+				if (!hashSet.contains(depColumn[i])) {
+					ind = false;
+					break;
+				}
+			}
+		}
+
+		//LargeMessageProxy.LargeMessage completionMessage = (LargeMessageProxy.LargeMessage) new DependencyMiner.CompletionMessage(this.getContext().getSelf(), ind);
+		//this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, message.getDependencyMinerLargeMessageProxy()));
+		// Use regular message sending instead of LMP for CompletionMsg
+		message.getReplyTo().tell(new DependencyMiner.CompletionMessage(this.getContext().getSelf(), ind));
 
 		return this;
+	}
+
+	private Behavior<Message> handle(ShutdownMessage message) {
+		this.getContext().getLog().info("Shutting down Dependency Worker!");
+		return Behaviors.stopped();
 	}
 }
