@@ -8,7 +8,7 @@ Akka example and homework code for the "Big Data Systems" lecture.
 ## Getting started
 1. Clone repo
   ```
-  git clone https://github.com/UMR-Big-Data-Analytics/ddm-akka.git
+  git clone https://github.com/LyyNgg/Big-Data-class.git
   ```
         
 2. Decompress test data
