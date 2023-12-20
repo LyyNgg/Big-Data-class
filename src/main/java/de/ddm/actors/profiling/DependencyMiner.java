@@ -252,7 +252,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			taskColumns.add(refColumn);
 
 			//Implement LMP to send task
-			LargeMessageProxy.LargeMessage taskMessage = new DependencyWorker.TaskMessage(this.largeMessageProxy, taskColumns);
+			LargeMessageProxy.LargeMessage taskMessage = new DependencyWorker.TaskMessage(this.getContext().getSelf(), taskColumns);
 			// LargeMessageProxy.LargeMessage completionMessage = new DependencyMiner.CompletionMessage(this.getContext().getSelf(), ind);
 			//
 
