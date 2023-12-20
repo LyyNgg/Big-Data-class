@@ -52,7 +52,7 @@ public class Master extends AbstractBehavior<Master.Message> {
 	// Actor State //
 	/////////////////
 
-	private final ActorRef<DependencyMiner.Message> dependencyMiner;
+	private ActorRef<DependencyMiner.Message> dependencyMiner;
 
 	////////////////////
 	// Actor Behavior //
@@ -76,6 +76,14 @@ public class Master extends AbstractBehavior<Master.Message> {
 		// we should propagate this ShutdownMessage to all active child actors so that they
 		// can end their protocols in a clean way. Simply stopping this actor also stops all
 		// child actors, but in a hard way!
+		shutdown();
 		return Behaviors.stopped();
+	}
+
+	private void shutdown() {
+		if (this.dependencyMiner != null) {
+			this.dependencyMiner.tell(new DependencyMiner.ShutdownMessage());
+			this.dependencyMiner = null;
+		}
 	}
 }
