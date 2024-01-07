@@ -1,5 +1,6 @@
 # ddm-akka
 Akka example and homework code for the "Big Data Systems" lecture.
+Details of solution is mentioned in file Solution.pptx
 
 ## Requirements
 - Java 9 >=
